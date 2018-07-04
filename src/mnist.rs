@@ -67,25 +67,25 @@ impl<'a> Images<'a> {
         }
     }
 
-    pub fn get<'b>(&self, n: usize) -> Option<DMatrix<u8>> {
+    pub fn get<'b>(&self, n: usize) -> Option<DMatrix<f64>> {
         if n + self.size.1 <= self.data.len() {
-            Some(DMatrix::<u8>::from_iterator(self.size.0, self.size.1,
+            Some(DMatrix::<f64>::from_iterator(self.size.0, self.size.1,
                 self.data.iter()
                     .skip(self.size.0 * self.size.1 * n)
                     .take(self.size.0 * self.size.1)
-                    .map(|x| *x)))
+                    .map(|x| (*x as f64) / 255.0)))
         } else {
             None
         }
     }
 
-    pub fn get_flat<'b>(&self, n: usize) -> Option<DMatrix<u8>> {
+    pub fn get_flat<'b>(&self, n: usize) -> Option<DMatrix<f64>> {
         if n + self.size.1 <= self.data.len() {
-            Some(DMatrix::<u8>::from_iterator(self.size.0 * self.size.1, 1,
+            Some(DMatrix::<f64>::from_iterator(self.size.0 * self.size.1, 1,
                 self.data.iter()
                     .skip(self.size.0 * self.size.1 * n)
                     .take(self.size.0 * self.size.1)
-                    .map(|x| *x)))
+                    .map(|x| (*x as f64) / 255.0)))
         } else {
             None
         }
