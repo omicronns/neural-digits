@@ -1,0 +1,9 @@
+[package]
+name = "neural-digits"
+version = "0.1.0"
+authors = ["omicronns <omicronns@gmail.com>"]
+
+[dependencies]
+nalgebra = "0"
+flate2 = "1"
+byteorder = "1"
