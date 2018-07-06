@@ -81,7 +81,7 @@ impl<'a> Images<'a> {
 
     pub fn get_flat<'b>(&self, n: usize) -> Option<DMatrix<f64>> {
         if n + self.size.1 <= self.data.len() {
-            Some(DMatrix::<f64>::from_iterator(self.size.0 * self.size.1, 1,
+            Some(DMatrix::<f64>::from_iterator(1, self.size.0 * self.size.1,
                 self.data.iter()
                     .skip(self.size.0 * self.size.1 * n)
                     .take(self.size.0 * self.size.1)
