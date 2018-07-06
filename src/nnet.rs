@@ -28,7 +28,7 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn rand(input: usize, hidden: usize, output: usize, activation: fn(f64) -> f64) -> Network {
+    pub fn new_rand(input: usize, hidden: usize, output: usize, activation: fn(f64) -> f64) -> Network {
         let hidden_layer = Layer {
             wages: DMatrix::<f64>::new_random(input, hidden),
             bias: DMatrix::<f64>::new_random(1, hidden)
@@ -69,24 +69,34 @@ impl Network {
     }
 }
 
+pub struct Data {
+    pub class: usize,
+    pub data: DMatrix<f64>,
+}
+
 pub struct Derivatives {
     djdwage: DMatrix<f64>,
     djdbias: DMatrix<f64>,
 }
 
-pub struct Trainer {
+pub struct Trainer<'a> {
     net: Network,
     rate: f64,
-    data: fn(usize) -> (usize, DMatrix<f64>),
-    labels: fn(usize) -> usize,
+    data: &'a Fn(usize) -> Data,
     dactivation: fn(f64) -> f64,
 }
 
-impl Trainer {
+impl<'a> Trainer<'a> {
+    pub fn new(net: Network, rate: f64, data: &'a Fn(usize) -> Data, dactivation: fn(f64) -> f64) -> Trainer<'a> {
+        Trainer {
+            net, rate, data, dactivation
+        }
+    }
+
     pub fn detach(self) -> Network {
         self.net
     }
-    
+
     pub fn calc_errors(&self, output: DMatrix<f64>, n: usize) -> DMatrix<f64> {
         DMatrix::<f64>::from_iterator(1, output.ncols(), output.iter().enumerate()
             .map(|(it, x)| if it == n {
@@ -96,17 +106,9 @@ impl Trainer {
             }))
     }
 
-    // pub fn calc_derivatives(&self, state: State, n: usize) -> Vec<Derivatives> {
-    //     let mut derivatives = Vec::<Derivatives>::new();
-    //     let errors = self.calc_errors(state.output, n);
-    //     let sigma2 = errors * (state.hidden);
-    //     let hidden = (&self.hidden.wages * &input + &self.hidden.bias).map(|x| (self.activation)(x));
-    //     let output = (&self.output.wages * &hidden + &self.output.bias).map(|x| (self.activation)(x));
-    //     for layer in self.net.layers.iter().rev() {
-    //         let x = (&layer.wages * &input + &layer.bias).map(|x| (self.dactivation)(x));
-    //         let y = 
-    //         // derivatives.push();
-    //     }
-    //     derivatives
-    // }
+    pub fn calc_derivatives(&self, state: State, n: usize) {
+        let errors = self.calc_errors(state.output, n);
+        let sigma2 = errors * (state.hidden * &self.net.hidden.wages + &self.net.hidden.bias).map(|x| (self.dactivation)(x));
+        println!("{:?}", sigma2.shape());
+    }
 }
