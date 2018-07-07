@@ -3,6 +3,18 @@
 mod mnist;
 mod nnet;
 
+fn read<T>() -> Result<T, String>
+where
+    T: std::str::FromStr {
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+    let line = input.trim_right();
+    match line.parse() {
+        Ok(n) => Ok(n),
+        Err(_) => Err(String::from(line)),
+    }
+}
+
 fn train(labels_path: &'static str, images_path: &'static str, netpath: Option<&str>) -> nnet::Network {
     let labels = mnist::import_data(labels_path);
     let labels = mnist::get_labels(&labels).unwrap();
@@ -10,28 +22,44 @@ fn train(labels_path: &'static str, images_path: &'static str, netpath: Option<&
     let images = mnist::Images::new(&images).unwrap();
 
     let epochs: usize;
+    println!("configure network:");
     loop {
-        println!("select number of epochs:");
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
-        epochs = match input.trim_right().parse() {
+        println!("epochs:");
+        epochs = match read::<usize>() {
             Ok(n) => n,
-            Err(_) =>  {
+            Err(s) => {
                 println!("invalid input");
                 continue;
-            },
+            }
         };
         break;
     }
+    let mut dims = Vec::<usize>::new();
+    dims.push(images.size.0 * images.size.1);
+    println!("hint: one 15 neurons layer is a good choice");
+    loop {
+        println!("add layer, select number of neurons or q to stop:");
+        dims.push(match read::<usize>() {
+            Ok(n) => n,
+            Err(s) => match &s[..] {
+                "q" => break,
+                _ => {
+                    println!("invalid input");
+                    continue;
+                }
+            }
+        });
+    }
+    dims.push(10);
     let net = match netpath {
         Some(netpath) => match nnet::Network::from_file(netpath) {
             Some(net) => {
                 println!("network loaded from: {}", netpath);
                 net
             },
-            None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], 10.0)
+            None => nnet::Network::new_rand(&dims, 10.0)
         },
-        None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], 10.0)
+        None => nnet::Network::new_rand(&dims, 10.0)
     };
     net.info();
 
@@ -68,7 +96,7 @@ fn check_manual(net: &nnet::Network, labels_path: &'static str, images_path: &'s
 
     let mut successes = 0;
     loop {
-        println!("select image number (0-{}):", labels.len());
+        println!("select image number or q to quit [0-{}]:", labels.len() - 1);
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
         let n = match input.trim_right().parse::<usize>() {
