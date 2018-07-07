@@ -1,4 +1,3 @@
-extern crate serde_derive;
 extern crate bincode;
 extern crate nalgebra as na;
 
@@ -136,13 +135,17 @@ impl<'a> Trainer<'a> {
 
     pub fn learn(mut self, epochs: usize) -> Network {
         for epoch in 0..epochs {
+            let mut error = 0.0;
             let rate = (self.rate)(epoch);
+            println!("-----------------------");
             println!("epoch: {}", epoch);
             println!("rate:  {}", rate);
             for it in 0..self.datalen {
                 let data = (self.data)(it);
                 let state = self.net.eval(data.data);
                 let mut errors = state.errors(data.class);
+                let itererr = errors.iter().map(|x| x.powi(2)).sum::<f64>();
+                error = ((error * it as f64) + itererr) / (it as f64 + 1.0);
                 let mut wages = DMatrix::<f64>::identity(errors.ncols(), errors.ncols());
                 for (layer, state) in self.net.layers.iter_mut().rev().zip(state.layers.iter().rev().skip(1)) {
                     let derivative = (state * &layer.wages + &layer.bias).map(|x| dsigmoid(x));
@@ -154,7 +157,9 @@ impl<'a> Trainer<'a> {
                     layer.bias -= rate * dbias;
                 }
             }
+            println!("error: {}", error);
         }
+        println!("-----------------------");
         self.net
     }
 }
