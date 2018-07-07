@@ -145,16 +145,14 @@ impl<'a> Trainer<'a> {
                 let mut errors = state.errors(data.class);
                 let mut wages = DMatrix::<f64>::identity(errors.ncols(), errors.ncols());
                 for (layer, state) in self.net.layers.iter_mut().rev().zip(state.layers.iter().rev().skip(1)) {
-                    let deirvative = (state * &layer.wages + &layer.bias).map(|x| dsigmoid(x));
-                    let dbias = (&errors * &wages).component_mul(&deirvative);
+                    let derivative = (state * &layer.wages + &layer.bias).map(|x| dsigmoid(x));
+                    let dbias = (&errors * &wages).component_mul(&derivative);
                     let dwages = state.transpose() * &dbias;
-                    layer.wages -= rate * dwages;
-                    layer.bias -= rate * &dbias;
-                    errors = dbias;
                     wages = layer.wages.transpose();
+                    errors = dbias.clone();
+                    layer.wages -= rate * dwages;
+                    layer.bias -= rate * dbias;
                 }
-                let error = errors.iter().map(|x| x.powi(2)).sum::<f64>();
-                println!("it: {:8} error: {:.16}", it, error);
             }
         }
         self.net
