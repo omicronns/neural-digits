@@ -79,7 +79,7 @@ fn train(labels_path: &'static str, images_path: &'static str, netpath: Option<&
         None => get_setup(None, images.size.0 * images.size.1)
     };
 
-    match setup {
+    let net = match setup {
         (net, datalen, Some(epochs)) => {
             let data = |n| nnet::Data { class: labels[n] as usize, data: images.get_flat(n).unwrap() };
             let rate = |e| 3.0 - e as f64 * (2.0 / epochs as f64);
@@ -91,7 +91,9 @@ fn train(labels_path: &'static str, images_path: &'static str, netpath: Option<&
             trainer.learn(epochs)
         },
         (net, _, _) => net
-    }
+    };
+    net.info();
+    net
 }
 
 fn check(net: &nnet::Network, labels_path: &'static str, images_path: &'static str) {
