@@ -38,9 +38,8 @@ pub fn get_labels(data: &[u8]) -> Result<&[u8], &str> {
     }
 }
 
-#[derive(Debug)]
 pub struct Images<'a> {
-    size: (usize, usize),
+    pub size: (usize, usize),
     data: &'a[u8],
 }
 
@@ -64,18 +63,6 @@ impl<'a> Images<'a> {
                 }
             },
             _ => Err("could not read header")
-        }
-    }
-
-    pub fn get<'b>(&self, n: usize) -> Option<DMatrix<f64>> {
-        if n + self.size.1 <= self.data.len() {
-            Some(DMatrix::<f64>::from_iterator(self.size.0, self.size.1,
-                self.data.iter()
-                    .skip(self.size.0 * self.size.1 * n)
-                    .take(self.size.0 * self.size.1)
-                    .map(|x| (*x as f64) / 255.0)))
-        } else {
-            None
         }
     }
 

@@ -7,13 +7,31 @@ pub fn sigmoid(x: f64) -> f64 {
 }
 
 pub fn dsigmoid(x: f64) -> f64 {
-    (-x).exp() / (1.0 + (-x).exp()).exp2()
+    (-x).exp() / (1.0 + (-x).exp()).powi(2)
 }
 
 pub struct State {
     pub input: DMatrix<f64>,
     pub hidden: DMatrix<f64>,
     pub output: DMatrix<f64>,
+}
+
+impl State {
+    pub fn predicted(&self) -> usize {
+        self.output.iter().enumerate().scan((0, self.output[0]), |s, (it, x)| {
+            *s = if *x > s.1 {
+                (it, *x)
+            } else {
+                *s
+            };
+            Some(s.0)
+        }).last().unwrap()
+    }
+
+    pub fn errors(&self, class: usize) -> DMatrix<f64> {
+        DMatrix::<f64>::from_iterator(1, self.output.ncols(), self.output.iter().enumerate()
+            .map(|(it, x)| if class == it { *x - 1.0 } else { *x }))
+    }
 }
 
 pub struct Layer {
@@ -28,22 +46,24 @@ pub struct Network {
 }
 
 impl Network {
-    pub fn new_rand(input: usize, hidden: usize, output: usize, activation: fn(f64) -> f64) -> Self {
-        let hidden_layer = Layer {
-            wages: DMatrix::<f64>::new_random(input, hidden),
-            bias: DMatrix::<f64>::new_random(1, hidden)
-        };
-        let output_layer = Layer {
-            wages: DMatrix::<f64>::new_random(hidden, output),
-            bias: DMatrix::<f64>::new_random(1, output)
-        };
-        Network { hidden: hidden_layer, output: output_layer, activation }
+    pub fn new_rand(input: usize, hidden: usize, output: usize, activation: fn(f64) -> f64, scale: f64) -> Self {
+        Network {
+            hidden: Layer {
+                wages: DMatrix::<f64>::new_random(input, hidden).map(|x| x * scale - 0.5 * scale),
+                bias: DMatrix::<f64>::new_random(1, hidden).map(|x| x * scale - 0.5 * scale)
+            },
+            output: Layer {
+                wages: DMatrix::<f64>::new_random(hidden, output).map(|x| x * scale - 0.5 * scale),
+                bias: DMatrix::<f64>::new_random(1, output).map(|x| x * scale - 0.5 * scale)
+            },
+            activation
+        }
     }
 
     pub fn info(&self) {
-        println!("++++++ Network info ++++++");
         let hshape = self.hidden.wages.shape();
         let oshape = self.output.wages.shape();
+        println!("++++++ Network info ++++++");
         println!("input dim:         {}", hshape.0);
         println!("hidden layer dims: ({},{})", hshape.0, hshape.1);
         println!("output layer dims: ({},{})", oshape.0, oshape.1);
@@ -72,44 +92,36 @@ struct Derivatives {
 
 pub struct Trainer<'a> {
     pub net: Network,
-    pub rate: f64,
+    pub rate: &'a Fn(usize) -> f64,
     pub data: &'a Fn(usize) -> Data,
     pub datalen: usize,
     pub dactivation: fn(f64) -> f64,
 }
 
 impl<'a> Trainer<'a> {
-    pub fn new(net: Network, rate: f64, data: &'a Fn(usize) -> Data, datalen: usize, dactivation: fn(f64) -> f64) -> Trainer<'a> {
+    pub fn new(net: Network, rate: &'a Fn(usize) -> f64, data: &'a Fn(usize) -> Data, datalen: usize, dactivation: fn(f64) -> f64) -> Trainer<'a> {
         Trainer {
             net, rate, data, datalen, dactivation
         }
     }
 
-    pub fn learn(mut self) -> Network {
-        for epoch in 0..self.datalen {
-            println!("++++++ epoch begin: {}", epoch);
-            let data = (self.data)(epoch);
-            let state = self.net.eval(data.data);
-            let errors = self.calc_errors(&state.output, data.class);
-            let derivatives = self.calc_derivatives(state, &errors);
-            self.net.hidden.wages -= self.rate * &derivatives.dwagesh;
-            self.net.hidden.bias -= self.rate * &derivatives.dbiash;
-            self.net.output.wages -= self.rate * &derivatives.dwageso;
-            self.net.output.bias -= self.rate * &derivatives.dbiaso;
-            println!("-- error: {}", errors.iter().map(|x| x.powi(2)).sum::<f64>());
-            println!("++++++ epoch end: {}", epoch);
-            println!("");
+    pub fn learn(mut self, epochs: usize) -> Network {
+        for epoch in 0..epochs {
+            println!("epoch: {}", epoch);
+            for it in 0..self.datalen {
+                let data = (self.data)(it);
+                let state = self.net.eval(data.data);
+                let errors = state.errors(data.class);
+                let derivatives = self.calc_derivatives(state, &errors);
+                let rate = (self.rate)(epoch);
+                self.net.hidden.wages -= rate * &derivatives.dwagesh;
+                self.net.hidden.bias -= rate * &derivatives.dbiash;
+                self.net.output.wages -= rate * &derivatives.dwageso;
+                self.net.output.bias -= rate * &derivatives.dbiaso;
+                println!("it: {:8} error: {}", it, errors.iter().map(|x| x.powi(2)).sum::<f64>());
+            }
         }
         self.net
-    }
-
-    fn calc_errors(&self, output: &DMatrix<f64>, class: usize) -> DMatrix<f64> {
-        DMatrix::<f64>::from_iterator(1, output.ncols(), output.iter().enumerate()
-            .map(|(it, x)| if class == it {
-                *x - 1.0
-            } else {
-                *x
-            }))
     }
 
     fn calc_derivatives(&self, state: State, errors: &DMatrix<f64>) -> Derivatives {
