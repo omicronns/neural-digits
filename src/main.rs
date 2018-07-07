@@ -4,14 +4,20 @@ extern crate serde_derive;
 mod mnist;
 mod nnet;
 
-fn train(labels_path: &'static str, images_path: &'static str, netfile: Option<&str>) -> nnet::Network {
+fn train(labels_path: &'static str, images_path: &'static str, netpath: Option<&str>) -> nnet::Network {
     let labels = mnist::import_data(labels_path);
     let labels = mnist::get_labels(&labels).unwrap();
     let images = mnist::import_data(images_path);
     let images = mnist::Images::new(&images).unwrap();
 
-    let net = match netfile {
-        Some(path) => nnet::load_net(path),
+    let net = match netpath {
+        Some(path) => match nnet::load_net(path) {
+            Some(net) => {
+                println!("network loaded from: {}", path);
+                net
+            },
+            None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], 10.0)
+        },
         None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], 10.0)
     };
     net.info();

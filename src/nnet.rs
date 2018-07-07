@@ -7,9 +7,14 @@ use self::na::DMatrix;
 
 use std::fs::File;
 
-pub fn load_net(path: &str) -> Network {
-    let netfile = File::open(path).expect("could not open file");
-    deserialize_from(&netfile).expect("could not deserialize")
+pub fn load_net(netpath: &str) -> Option<Network> {
+    match File::open(netpath) {
+        Ok(netfile) => match deserialize_from(netfile) {
+            Ok(net) => Some(net),
+            Err(_) => None
+        },
+        Err(_) => None
+    }
 }
 
 pub fn dump_net(net: &Network, path: &str) {
