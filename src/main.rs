@@ -11,9 +11,9 @@ fn train(labels_path: &'static str, images_path: &'static str, netpath: Option<&
     let images = mnist::Images::new(&images).unwrap();
 
     let net = match netpath {
-        Some(path) => match nnet::load_net(path) {
+        Some(netpath) => match nnet::Network::from_file(netpath) {
             Some(net) => {
-                println!("network loaded from: {}", path);
+                println!("network loaded from: {}", netpath);
                 net
             },
             None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 10, 10, 15, 10], 10.0)

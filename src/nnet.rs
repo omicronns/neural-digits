@@ -6,21 +6,6 @@ use self::na::DMatrix;
 
 use std::fs::File;
 
-pub fn load_net(netpath: &str) -> Option<Network> {
-    match File::open(netpath) {
-        Ok(netfile) => match deserialize_from(netfile) {
-            Ok(net) => Some(net),
-            Err(_) => None
-        },
-        Err(_) => None
-    }
-}
-
-pub fn dump_net(net: &Network, path: &str) {
-    let mut netfile = File::create(path).expect("could not create file");
-    serialize_into(&mut netfile, &net).expect("could not serialize");
-}
-
 fn sigmoid(x: f64) -> f64 {
     if x > -300.0 {
         1.0 / (1.0 + (-x).exp())
@@ -100,6 +85,21 @@ impl Network {
         Network {
             layers
         }
+    }
+
+    pub fn from_file(netpath: &str) -> Option<Network> {
+        match File::open(netpath) {
+            Ok(netfile) => match deserialize_from(netfile) {
+                Ok(net) => Some(net),
+                Err(_) => None
+            },
+            Err(_) => None
+        }
+    }
+
+    pub fn dump(&self, netpath: &str) {
+        let mut netfile = File::create(netpath).expect("could not create file");
+        serialize_into(&mut netfile, &self).expect("could not serialize");
     }
 
     pub fn info(&self) {
