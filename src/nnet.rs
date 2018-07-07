@@ -6,6 +6,15 @@ use self::na::DMatrix;
 
 use std::fs::File;
 
+pub fn print_matrix(rows: usize, cols: usize, mat: &DMatrix<f64>) {
+    for row in 0..rows {
+        for col in 0..cols {
+            print!("{} ", if mat[row * rows + col] > 0.5 { 'X' } else { ' ' });
+        }
+        println!("");
+    }
+}
+
 fn sigmoid(x: f64) -> f64 {
     if x > -300.0 {
         1.0 / (1.0 + (-x).exp())
