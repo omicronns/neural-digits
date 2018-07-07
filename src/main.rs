@@ -50,5 +50,5 @@ fn check(net: nnet::Network, labels_path: &'static str, images_path: &'static st
 
 fn main() {
     let net_trained = train("./res/train-labels-idx1-ubyte.gz", "./res/train-images-idx3-ubyte.gz", Some("./res/netfile.bin"));
-    check(net_trained, "./res/train-labels-idx1-ubyte.gz", "./res/train-images-idx3-ubyte.gz");
+    check(net_trained, "./res/t10k-labels-idx1-ubyte.gz", "./res/t10k-images-idx3-ubyte.gz");
 }

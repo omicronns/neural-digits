@@ -137,7 +137,7 @@ impl<'a> Trainer<'a> {
         for epoch in 0..epochs {
             let mut error = 0.0;
             let rate = (self.rate)(epoch);
-            println!("-----------------------");
+            println!("--------------------------");
             println!("epoch: {}", epoch);
             println!("rate:  {}", rate);
             for it in 0..self.datalen {
@@ -159,7 +159,7 @@ impl<'a> Trainer<'a> {
             }
             println!("error: {}", error);
         }
-        println!("-----------------------");
+        println!("--------------------------");
         self.net
     }
 }
