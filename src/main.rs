@@ -7,13 +7,13 @@ fn train(labels_path: &'static str, images_path: &'static str) -> nnet::Network 
     let images = mnist::import_data(images_path);
     let images = mnist::Images::new(&images).unwrap();
 
-    let net = nnet::Network::new_rand(images.size.0 * images.size.1, 15, 10, nnet::sigmoid, 10.0);
+    let net = nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], nnet::sigmoid, 10.0);
     net.info();
 
-    let epochs = 40;
+    let epochs = 30;
     let data = |n| nnet::Data { class: labels[n] as usize, data: images.get_flat(n).unwrap() };
     let rate = |e| 3.0 - e as f64 * (2.0 / epochs as f64);
-    let trainer = nnet::Trainer::new(net, &rate, &data, 10000, nnet::dsigmoid);
+    let trainer = nnet::Trainer::new(net, &rate, &data, 1000, nnet::dsigmoid);
 
     trainer.learn(epochs)
 }
@@ -25,15 +25,12 @@ fn check(net: nnet::Network, labels_path: &'static str, images_path: &'static st
     let images = mnist::Images::new(&images).unwrap();
 
     let mut successes = 0;
-    for it in 0..1000 {
+    for it in 0..100 {
         let img = images.get_flat(it).unwrap();
         let state = net.eval(img);
         let expected = labels[it] as usize;
         if state.predicted() == expected {
-            println!("prediction valid, yay!");
             successes += 1;
-        } else {
-            println!("prediction invalid");
         }
     }
     println!("success rate: {}", successes as f64 / 1000.0);

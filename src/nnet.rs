@@ -11,14 +11,16 @@ pub fn dsigmoid(x: f64) -> f64 {
 }
 
 pub struct State {
-    pub input: DMatrix<f64>,
-    pub hidden: DMatrix<f64>,
-    pub output: DMatrix<f64>,
+    pub layers: Vec<DMatrix<f64>>,
 }
 
 impl State {
     pub fn predicted(&self) -> usize {
-        self.output.iter().enumerate().scan((0, self.output[0]), |s, (it, x)| {
+        let output = self.layers.iter().last().unwrap();
+        let first = output[0];
+        output.iter()
+            .enumerate()
+            .scan((0, first), |s, (it, x)| {
             *s = if *x > s.1 {
                 (it, *x)
             } else {
@@ -29,7 +31,8 @@ impl State {
     }
 
     pub fn errors(&self, class: usize) -> DMatrix<f64> {
-        DMatrix::<f64>::from_iterator(1, self.output.ncols(), self.output.iter().enumerate()
+        let output = self.layers.iter().last().unwrap();
+        DMatrix::<f64>::from_iterator(1, output.ncols(), output.iter().enumerate()
             .map(|(it, x)| if class == it { *x - 1.0 } else { *x }))
     }
 }
@@ -40,41 +43,42 @@ pub struct Layer {
 }
 
 pub struct Network {
-    pub hidden: Layer,
-    pub output: Layer,
+    pub layers: Vec<Layer>,
     pub activation: fn(f64) -> f64,
 }
 
 impl Network {
-    pub fn new_rand(input: usize, hidden: usize, output: usize, activation: fn(f64) -> f64, scale: f64) -> Self {
+    pub fn new_rand(dims: &[usize], activation: fn(f64) -> f64, scale: f64) -> Self {
+        let mut layers = Vec::<Layer>::new();
+        for dim in dims.windows(2) {
+            layers.push(Layer {
+                wages: DMatrix::<f64>::new_random(dim[0], dim[1]).map(|x| x * scale - 0.5 * scale),
+                bias: DMatrix::<f64>::new_random(1, dim[1]).map(|x| x * scale - 0.5 * scale)
+            });
+        }
         Network {
-            hidden: Layer {
-                wages: DMatrix::<f64>::new_random(input, hidden).map(|x| x * scale - 0.5 * scale),
-                bias: DMatrix::<f64>::new_random(1, hidden).map(|x| x * scale - 0.5 * scale)
-            },
-            output: Layer {
-                wages: DMatrix::<f64>::new_random(hidden, output).map(|x| x * scale - 0.5 * scale),
-                bias: DMatrix::<f64>::new_random(1, output).map(|x| x * scale - 0.5 * scale)
-            },
+            layers,
             activation
         }
     }
 
     pub fn info(&self) {
-        let hshape = self.hidden.wages.shape();
-        let oshape = self.output.wages.shape();
         println!("++++++ Network info ++++++");
-        println!("input dim:         {}", hshape.0);
-        println!("hidden layer dims: ({},{})", hshape.0, hshape.1);
-        println!("output layer dims: ({},{})", oshape.0, oshape.1);
-        println!("output dim:        {}", oshape.1);
+        for (it, layer) in self.layers.iter().enumerate() {
+            println!("layer {:2} dim({},{})", it, layer.wages.nrows(), layer.wages.ncols());
+        }
         println!("++++++++++++++++++++++++++");
     }
 
     pub fn eval(&self, input: DMatrix<f64>) -> State {
-        let hidden = (&input * &self.hidden.wages + &self.hidden.bias).map(|x| (self.activation)(x));
-        let output = (&hidden * &self.output.wages + &self.output.bias).map(|x| (self.activation)(x));
-        State {input, hidden, output }
+        let mut layers = Vec::<DMatrix<f64>>::new();
+        let mut state = input.clone();
+        layers.push(input);
+        for layer in &self.layers {
+            state = (&state * &layer.wages + &layer.bias).map(|x| (self.activation)(x));
+            layers.push(state.clone());
+        }
+        State { layers }
     }
 }
 
@@ -84,10 +88,8 @@ pub struct Data {
 }
 
 struct Derivatives {
-    dbiaso: DMatrix<f64>,
-    dbiash: DMatrix<f64>,
-    dwageso: DMatrix<f64>,
-    dwagesh: DMatrix<f64>,
+    dbias: DMatrix<f64>,
+    dwages: DMatrix<f64>,
 }
 
 pub struct Trainer<'a> {
@@ -113,29 +115,22 @@ impl<'a> Trainer<'a> {
             for it in 0..self.datalen {
                 let data = (self.data)(it);
                 let state = self.net.eval(data.data);
-                let errors = state.errors(data.class);
-                let derivatives = self.calc_derivatives(state, &errors);
-                self.net.hidden.wages -= rate * &derivatives.dwagesh;
-                self.net.hidden.bias -= rate * &derivatives.dbiash;
-                self.net.output.wages -= rate * &derivatives.dwageso;
-                self.net.output.bias -= rate * &derivatives.dbiaso;
-                // println!("it: {:8} error: {}", it, errors.iter().map(|x| x.powi(2)).sum::<f64>());
+                let mut errors = state.errors(data.class);
+                let mut wages = DMatrix::<f64>::identity(errors.ncols(), errors.ncols());
+                let dactivation = self.dactivation;
+                for (layer, state) in self.net.layers.iter_mut().rev().zip(state.layers.iter().rev().skip(1)) {
+                    let deirvative = (state * &layer.wages + &layer.bias).map(|x| (dactivation)(x));
+                    let dbias = (&errors * &wages).component_mul(&deirvative);
+                    let dwages = state.transpose() * &dbias;
+                    layer.wages -= rate * dwages;
+                    layer.bias -= rate * &dbias;
+                    errors = dbias;
+                    wages = layer.wages.transpose();
+                }
+                let error = errors.iter().map(|x| x.powi(2)).sum::<f64>();
+                println!("it: {:8} error: {:.16}", it, error);
             }
         }
         self.net
-    }
-
-    fn calc_derivatives(&self, state: State, errors: &DMatrix<f64>) -> Derivatives {
-        let dbiaso = (&state.hidden * &self.net.output.wages + &self.net.output.bias)
-            .map(|x| (self.dactivation)(x))
-            .component_mul(&errors);
-        let dbiash = (&state.input * &self.net.hidden.wages + &self.net.hidden.bias)
-            .map(|x| (self.dactivation)(x))
-            .component_mul(&(&dbiaso * &self.net.output.wages.transpose()));
-        let dwageso = &state.hidden.transpose() * &dbiaso;
-        let dwagesh = &state.input.transpose() * &dbiash;
-        Derivatives {
-            dbiaso, dbiash, dwageso, dwagesh
-        }
     }
 }
