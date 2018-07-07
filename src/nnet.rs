@@ -1,12 +1,27 @@
+extern crate serde_derive;
+extern crate bincode;
 extern crate nalgebra as na;
 
+use self::bincode::{serialize_into, deserialize_from};
 use self::na::DMatrix;
 
-pub fn sigmoid(x: f64) -> f64 {
+use std::fs::File;
+
+pub fn load_net(path: &str) -> Network {
+    let netfile = File::open(path).expect("could not open file");
+    deserialize_from(&netfile).expect("could not deserialize")
+}
+
+pub fn dump_net(net: &Network, path: &str) {
+    let mut netfile = File::create(path).expect("could not create file");
+    serialize_into(&mut netfile, &net).expect("could not serialize");
+}
+
+fn sigmoid(x: f64) -> f64 {
     1.0 / (1.0 + (-x).exp())
 }
 
-pub fn dsigmoid(x: f64) -> f64 {
+fn dsigmoid(x: f64) -> f64 {
     (-x).exp() / (1.0 + (-x).exp()).powi(2)
 }
 
@@ -15,7 +30,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn predicted(&self) -> usize {
+    pub fn class(&self) -> usize {
         let output = self.layers.iter().last().unwrap();
         let first = output[0];
         output.iter()
@@ -37,18 +52,19 @@ impl State {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Layer {
     pub wages: DMatrix<f64>,
     pub bias: DMatrix<f64>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Network {
     pub layers: Vec<Layer>,
-    pub activation: fn(f64) -> f64,
 }
 
 impl Network {
-    pub fn new_rand(dims: &[usize], activation: fn(f64) -> f64, scale: f64) -> Self {
+    pub fn new_rand(dims: &[usize], scale: f64) -> Self {
         let mut layers = Vec::<Layer>::new();
         for dim in dims.windows(2) {
             layers.push(Layer {
@@ -57,8 +73,7 @@ impl Network {
             });
         }
         Network {
-            layers,
-            activation
+            layers
         }
     }
 
@@ -75,7 +90,7 @@ impl Network {
         let mut state = input.clone();
         layers.push(input);
         for layer in &self.layers {
-            state = (&state * &layer.wages + &layer.bias).map(|x| (self.activation)(x));
+            state = (&state * &layer.wages + &layer.bias).map(|x| sigmoid(x));
             layers.push(state.clone());
         }
         State { layers }
@@ -87,23 +102,17 @@ pub struct Data {
     pub data: DMatrix<f64>,
 }
 
-struct Derivatives {
-    dbias: DMatrix<f64>,
-    dwages: DMatrix<f64>,
-}
-
 pub struct Trainer<'a> {
     pub net: Network,
     pub rate: &'a Fn(usize) -> f64,
     pub data: &'a Fn(usize) -> Data,
     pub datalen: usize,
-    pub dactivation: fn(f64) -> f64,
 }
 
 impl<'a> Trainer<'a> {
-    pub fn new(net: Network, rate: &'a Fn(usize) -> f64, data: &'a Fn(usize) -> Data, datalen: usize, dactivation: fn(f64) -> f64) -> Trainer<'a> {
+    pub fn new(net: Network, rate: &'a Fn(usize) -> f64, data: &'a Fn(usize) -> Data, datalen: usize) -> Trainer<'a> {
         Trainer {
-            net, rate, data, datalen, dactivation
+            net, rate, data, datalen
         }
     }
 
@@ -117,9 +126,8 @@ impl<'a> Trainer<'a> {
                 let state = self.net.eval(data.data);
                 let mut errors = state.errors(data.class);
                 let mut wages = DMatrix::<f64>::identity(errors.ncols(), errors.ncols());
-                let dactivation = self.dactivation;
                 for (layer, state) in self.net.layers.iter_mut().rev().zip(state.layers.iter().rev().skip(1)) {
-                    let deirvative = (state * &layer.wages + &layer.bias).map(|x| (dactivation)(x));
+                    let deirvative = (state * &layer.wages + &layer.bias).map(|x| dsigmoid(x));
                     let dbias = (&errors * &wages).component_mul(&deirvative);
                     let dwages = state.transpose() * &dbias;
                     layer.wages -= rate * dwages;

@@ -1,19 +1,25 @@
+#[macro_use]
+extern crate serde_derive;
+
 mod mnist;
 mod nnet;
 
-fn train(labels_path: &'static str, images_path: &'static str) -> nnet::Network {
+fn train(labels_path: &'static str, images_path: &'static str, netfile: Option<&str>) -> nnet::Network {
     let labels = mnist::import_data(labels_path);
     let labels = mnist::get_labels(&labels).unwrap();
     let images = mnist::import_data(images_path);
     let images = mnist::Images::new(&images).unwrap();
 
-    let net = nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], nnet::sigmoid, 10.0);
+    let net = match netfile {
+        Some(path) => nnet::load_net(path),
+        None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], 10.0)
+    };
     net.info();
 
     let epochs = 30;
     let data = |n| nnet::Data { class: labels[n] as usize, data: images.get_flat(n).unwrap() };
     let rate = |e| 3.0 - e as f64 * (2.0 / epochs as f64);
-    let trainer = nnet::Trainer::new(net, &rate, &data, 1000, nnet::dsigmoid);
+    let trainer = nnet::Trainer::new(net, &rate, &data, 1000);
 
     trainer.learn(epochs)
 }
@@ -29,7 +35,7 @@ fn check(net: nnet::Network, labels_path: &'static str, images_path: &'static st
         let img = images.get_flat(it).unwrap();
         let state = net.eval(img);
         let expected = labels[it] as usize;
-        if state.predicted() == expected {
+        if state.class() == expected {
             successes += 1;
         }
     }
@@ -37,6 +43,6 @@ fn check(net: nnet::Network, labels_path: &'static str, images_path: &'static st
 }
 
 fn main() {
-    let net_trained = train("./res/train-labels-idx1-ubyte.gz", "./res/train-images-idx3-ubyte.gz");
+    let net_trained = train("./res/train-labels-idx1-ubyte.gz", "./res/train-images-idx3-ubyte.gz", Some("./res/netfile.bin"));
     check(net_trained, "./res/train-labels-idx1-ubyte.gz", "./res/train-images-idx3-ubyte.gz");
 }

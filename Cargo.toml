@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["omicronns <omicronns@gmail.com>"]
 
 [dependencies]
-nalgebra = "0"
-flate2 = "1"
-byteorder = "1"
+nalgebra = { version = "*", features = ["serde-serialize"] }
+flate2 = "*"
+byteorder = "*"
+bincode = "*"
+serde = "*"
+serde_derive = "*"
