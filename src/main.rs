@@ -16,9 +16,9 @@ fn train(labels_path: &'static str, images_path: &'static str, netpath: Option<&
                 println!("network loaded from: {}", path);
                 net
             },
-            None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], 10.0)
+            None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 10, 10, 15, 10], 10.0)
         },
-        None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 15, 10], 10.0)
+        None => nnet::Network::new_rand(&[images.size.0 * images.size.1, 10, 10, 15, 10], 10.0)
     };
     net.info();
 

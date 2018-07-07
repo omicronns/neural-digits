@@ -22,11 +22,19 @@ pub fn dump_net(net: &Network, path: &str) {
 }
 
 fn sigmoid(x: f64) -> f64 {
-    1.0 / (1.0 + (-x).exp())
+    if x > -300.0 {
+        1.0 / (1.0 + (-x).exp())
+    } else {
+        0.0
+    }
 }
 
 fn dsigmoid(x: f64) -> f64 {
-    (-x).exp() / (1.0 + (-x).exp()).powi(2)
+    if x > -300.0 {
+        (-x).exp() / (1.0 + (-x).exp()).powi(2)
+    } else {
+        0.0
+    }
 }
 
 pub struct State {
@@ -148,7 +156,8 @@ impl<'a> Trainer<'a> {
                 error = ((error * it as f64) + itererr) / (it as f64 + 1.0);
                 let mut wages = DMatrix::<f64>::identity(errors.ncols(), errors.ncols());
                 for (layer, state) in self.net.layers.iter_mut().rev().zip(state.layers.iter().rev().skip(1)) {
-                    let derivative = (state * &layer.wages + &layer.bias).map(|x| dsigmoid(x));
+                    let linear = state * &layer.wages + &layer.bias;
+                    let derivative = linear.map(|x| dsigmoid(x));
                     let dbias = (&errors * &wages).component_mul(&derivative);
                     let dwages = state.transpose() * &dbias;
                     wages = layer.wages.transpose();
