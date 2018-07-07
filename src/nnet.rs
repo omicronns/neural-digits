@@ -107,18 +107,19 @@ impl<'a> Trainer<'a> {
 
     pub fn learn(mut self, epochs: usize) -> Network {
         for epoch in 0..epochs {
+            let rate = (self.rate)(epoch);
             println!("epoch: {}", epoch);
+            println!("rate:  {}", rate);
             for it in 0..self.datalen {
                 let data = (self.data)(it);
                 let state = self.net.eval(data.data);
                 let errors = state.errors(data.class);
                 let derivatives = self.calc_derivatives(state, &errors);
-                let rate = (self.rate)(epoch);
                 self.net.hidden.wages -= rate * &derivatives.dwagesh;
                 self.net.hidden.bias -= rate * &derivatives.dbiash;
                 self.net.output.wages -= rate * &derivatives.dwageso;
                 self.net.output.bias -= rate * &derivatives.dbiaso;
-                println!("it: {:8} error: {}", it, errors.iter().map(|x| x.powi(2)).sum::<f64>());
+                // println!("it: {:8} error: {}", it, errors.iter().map(|x| x.powi(2)).sum::<f64>());
             }
         }
         self.net

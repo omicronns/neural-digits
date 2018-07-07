@@ -10,11 +10,12 @@ fn train(labels_path: &'static str, images_path: &'static str) -> nnet::Network 
     let net = nnet::Network::new_rand(images.size.0 * images.size.1, 15, 10, nnet::sigmoid, 10.0);
     net.info();
 
+    let epochs = 40;
     let data = |n| nnet::Data { class: labels[n] as usize, data: images.get_flat(n).unwrap() };
-    let rate = |_| 2.0;
+    let rate = |e| 3.0 - e as f64 * (2.0 / epochs as f64);
     let trainer = nnet::Trainer::new(net, &rate, &data, 10000, nnet::dsigmoid);
 
-    trainer.learn(30)
+    trainer.learn(epochs)
 }
 
 fn check(net: nnet::Network, labels_path: &'static str, images_path: &'static str) {
