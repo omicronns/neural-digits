@@ -77,6 +77,19 @@ impl Network {
         }
     }
 
+    pub fn from_element(dims: &[usize], element: f64) -> Self {
+        let mut layers = Vec::<Layer>::new();
+        for dim in dims.windows(2) {
+            layers.push(Layer {
+                wages: DMatrix::<f64>::from_element(dim[0], dim[1], element),
+                bias: DMatrix::<f64>::from_element(1, dim[1], element)
+            });
+        }
+        Network {
+            layers
+        }
+    }
+
     pub fn info(&self) {
         println!("++++++ Network info ++++++");
         for (it, layer) in self.layers.iter().enumerate() {
